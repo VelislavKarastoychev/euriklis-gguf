@@ -254,5 +254,38 @@ export class GGUF {
       1,
     );
     const typeInfo = GGUF.ggmlTypeToTypedArray(tensorInfo.dtype);
+    if (!typeInfo) {
+      this.logs = {
+        date: Date.now().toString(),
+        message: `Unsupported tensor data type ${tensorInfo.dtype}.`,
+      };
+
+      return null;
+    }
+    const { TypedArrayConstructor, elementSize } = typeInfo;
+    const expectedDataLength = elementSize * totalElements;
+    if (expectedDataLength > dataBuffer.length) {
+      this.logs = {
+        date: Date.now().toString(),
+        message:
+          "The data in the buffer is too short for expected number of total elements.",
+      };
+
+      return null;
+    }
+
+    let dataArray;
+    if (tensorInfo.dtype === 1) {
+      // GGML_TYPE_F16:
+      const uint16Array = new Uint16Array(
+        dataBuffer.buffer,
+        dataBuffer.byteOffset,
+        totalElements
+      );
+      const float32Array = new Float32Array(totalElements);
+      for (let i = 0;i < totalElements;i++) {
+        float32Array[i] = halfFloat2Float(uint16Array[i]);
+      }
+    }
   }
 }
