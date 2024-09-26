@@ -216,7 +216,7 @@ export class GGUF {
 
       return null;
     }
-    if (Number(this.tensorsCount) >= index) {
+    if (Number(this.tensorsCount) <= index) {
       this.logs = {
         date: Date.now().toString(),
         message: "The the tensor data is not loaded.",
@@ -224,7 +224,7 @@ export class GGUF {
 
       return null;
     }
-    if (index < 0 || Number(this.tensorsCount)) {
+    if (index < 0) {
       this.logs = {
         date: Date.now().toString(),
         message: "Incorrect tensor index.",
