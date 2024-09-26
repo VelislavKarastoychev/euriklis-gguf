@@ -7,6 +7,27 @@ import {
 import type { Integer, GGUFLogsType, TensorInfosType } from "./Types";
 
 export class GGUF {
+  public static ggmlTypeToTypedArray(dtype: number) {
+    const typeMap: {
+      [key: number]: {
+        name: string;
+        TypedArrayConstructor: any;
+        elementSize: number;
+      };
+    } = {
+      0: { name: "F32", TypedArrayConstructor: Float32Array, elementSize: 4 }, // GGML_TYPE_F32
+      1: { name: "F16", TypedArrayConstructor: Uint16Array, elementSize: 2 }, // GGML_TYPE_F16
+      24: { name: "I8", TypedArrayConstructor: Int8Array, elementSize: 1 }, // GGML_TYPE_I8
+      25: { name: "I16", TypedArrayConstructor: Int16Array, elementSize: 2 }, // GGML_TYPE_I16
+      26: { name: "I32", TypedArrayConstructor: Int32Array, elementSize: 4 }, // GGML_TYPE_I32
+      27: { name: "I64", TypedArrayConstructor: BigInt64Array, elementSize: 8 }, // GGML_TYPE_I64
+      28: { name: "F64", TypedArrayConstructor: Float64Array, elementSize: 8 }, // GGML_TYPE_F64
+      // Add other types as needed
+    };
+
+    return typeMap[dtype];
+  }
+
   private _alignment: Integer = 32;
   private _file: string = "";
   private _logs: GGUFLogsType[] = [];
@@ -181,39 +202,57 @@ export class GGUF {
   }
 
   readTensorByIndex(index: Integer) {
-    if (this.tensorsCount) {
-      if (this.tensorsCount >= index) {
-        this.logs = {
-          date: Date.now().toString(),
-          message: "The the tensor data is not loaded.",
-        };
+    if (!this.tensorsCount) {
+      this.logs = {
+        date: Date.now().toString(),
+        message: "No tensors or data not loaded.",
+      };
 
-        return null;
-      }
-      if (index < 0 || this.tensorsCount < index) {
-        this.logs = {
-          date: Date.now().toString(),
-          message: "Incorrect tensor index.",
-        };
-
-        return null;
-      }
-      const buffer = this.buffer;
-      if (!buffer) {
-        this.logs = {
-          date: Date.now().toString(),
-          message: "The buffer is not loaded",
-        };
-
-        return null;
-      }
-
-      // get the tensor info index.
-      const tensorInfo = this.tensorInfos[index];
-      const dataStart = alignOffset(this._metadataEndOffset);
-      const nextTensorInfo = this.tensorInfos[index]?.offset || buffer?.length;
-      const data = buffer?.slice(this._metadataEndOffset + tensorInfo.offset);
-      return data;
+      return null;
     }
+    if (this.tensorsCount >= index) {
+      this.logs = {
+        date: Date.now().toString(),
+        message: "The the tensor data is not loaded.",
+      };
+
+      return null;
+    }
+    if (index < 0 || this.tensorsCount < index) {
+      this.logs = {
+        date: Date.now().toString(),
+        message: "Incorrect tensor index.",
+      };
+
+      return null;
+    }
+    const buffer = this.buffer;
+    if (!buffer) {
+      this.logs = {
+        date: Date.now().toString(),
+        message: "The buffer is not loaded",
+      };
+
+      return null;
+    }
+
+    // get the tensor info index.
+    const tensorDataStart = alignOffset(
+      this._metadataEndOffset,
+      this.alignment,
+    );
+    const tensorInfo = this.tensorInfos[index];
+    const dataStart = tensorDataStart + Number(tensorInfo.offset);
+    let dataEnd: number;
+    if (index < this.tensorInfos.length - 1) {
+      const nextTensorInfo = this.tensorInfos[index + 1];
+      dataEnd = tensorDataStart + Number(nextTensorInfo.offset);
+    } else dataEnd = buffer.length;
+    const dataBuffer = buffer.slice(dataStart, dataEnd);
+    const totalElements = tensorInfo.shape.reduce(
+      (total, dim) => total * Number(dim),
+      1,
+    );
+    const typeInfo = GGUF.ggmlTypeToTypedArray(tensorInfo.dtype);
   }
 }
