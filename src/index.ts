@@ -5,7 +5,7 @@ import {
   readMetadataKeyValuePair,
   readTensorInfo,
 } from "./Models";
-import type { Integer, GGUFLogsType, TensorInfosType } from "./Types";
+import type { Integer, GGUFLogsType, TensorInfosType, TensorType } from "./Types";
 
 export class GGUF {
   public static ggmlTypeToTypedArray(dtype: number) {
@@ -202,7 +202,12 @@ export class GGUF {
     return false;
   }
 
-  readTensorByIndex(index: Integer) {
+  readTensorByIndex(index: Integer): {
+    name: string;
+    data: TensorType;
+    shape: bigint[];
+    dtype: number;
+  } | null {
     if (!this.tensorsCount) {
       this.logs = {
         date: Date.now().toString(),
@@ -211,7 +216,7 @@ export class GGUF {
 
       return null;
     }
-    if (this.tensorsCount >= index) {
+    if (Number(this.tensorsCount) >= index) {
       this.logs = {
         date: Date.now().toString(),
         message: "The the tensor data is not loaded.",
@@ -219,7 +224,7 @@ export class GGUF {
 
       return null;
     }
-    if (index < 0 || this.tensorsCount < index) {
+    if (index < 0 || Number(this.tensorsCount)) {
       this.logs = {
         date: Date.now().toString(),
         message: "Incorrect tensor index.",
