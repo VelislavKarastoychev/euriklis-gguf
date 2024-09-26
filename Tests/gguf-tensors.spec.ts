@@ -21,5 +21,12 @@ const answer = new validator(ggufData.tensorInfos)
   .describe(
     "1. return an array of object items which contain information for each tensor.",
   )
+  .test()
+  .and.bind(
+    new validator(tensor?.data.length).isSame(
+      tensor?.shape.reduce((a, b) => a * Number(b), 1),
+    ),
+  )
+  .describe("2. handle float16 type numbers.")
   .test().answer;
 test("GGUF tensorInfos", () => expect(answer).toBe(true));
