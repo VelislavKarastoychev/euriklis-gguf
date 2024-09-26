@@ -1,6 +1,7 @@
 "use strict";
 import {
   alignOffset,
+  halfFloat2Float,
   readMetadataKeyValuePair,
   readTensorInfo,
 } from "./Models";
@@ -286,6 +287,20 @@ export class GGUF {
       for (let i = 0;i < totalElements;i++) {
         float32Array[i] = halfFloat2Float(uint16Array[i]);
       }
+      dataArray = float32Array;
+    } else {
+      dataArray = new TypedArrayConstructor(
+        dataBuffer.buffer,
+        dataBuffer.byteOffset,
+        totalElements
+      );
+    }
+
+    return {
+      name: tensorInfo.name,
+      data: dataArray,
+      shape: tensorInfo.shape,
+      dtype: tensorInfo.dtype,
     }
   }
 }
