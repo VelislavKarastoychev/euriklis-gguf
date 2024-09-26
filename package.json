@@ -13,6 +13,7 @@
     "typescript": "^5.0.0"
   },
   "dependencies": {
-    "@euriklis/validator-ts": "^1.0.0"
+    "@euriklis/validator-ts": "^1.0.0",
+    "@huggingface/gguf": "^0.1.10"
   }
 }
