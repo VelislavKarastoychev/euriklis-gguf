@@ -19,5 +19,4 @@ const answer = new validator(ggufData.tensorInfos)
     "1. return an array of object items which contain information for each tensor.",
   )
   .test().answer;
-
 test("GGUF tensorInfos", () => expect(answer).toBe(true));
