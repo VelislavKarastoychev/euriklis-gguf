@@ -3,6 +3,7 @@ import { readMetadataKeyValuePair, readTensorInfo } from "./Models";
 import type { Integer, GGUFLogsType, TensorInfosType } from "./Types";
 
 export class GGUF {
+  private _alignment: Integer = 32;
   private _file: string = "";
   private _logs: GGUFLogsType[] = [];
   private _magic: string = "";
@@ -17,6 +18,14 @@ export class GGUF {
 
   constructor(file: string = "") {
     if (file) this.file = file;
+  }
+
+  get alignment(): Integer {
+    return this._alignment;
+  }
+
+  set alignment(alignment: Integer) {
+    this._alignment = alignment;
   }
 
   get file(): string {
@@ -154,10 +163,7 @@ export class GGUF {
       // store the end of the metadata offset;
       this._metadataEndOffset = this.offset;
       this.tensorInfos = tensorInfos;
-      // read the tensors:
-      let i;
-      for (i = 0; i < tensorsCount; i++) {}
-      console.log("Started reading of the tensors.");
+      this.alignment = this.metadata["general.alignment"] || this._alignment;
 
       return true;
     }
@@ -172,14 +178,37 @@ export class GGUF {
 
   readTensorByIndex(index: Integer) {
     if (this.tensorsCount) {
-      if (this.tensorsCount >= index)
-        throw new Error("Incorrect tensor index.");
+      if (this.tensorsCount >= index) {
+        this.logs = {
+          date: Date.now().toString(),
+          message: "The the tensor data is not loaded.",
+        };
+
+        return null;
+      }
+      if (index < 0 || this.tensorsCount < index) {
+        this.logs = {
+          date: Date.now().toString(),
+          message: "Incorrect tensor index.",
+        };
+
+        return null;
+      }
       const buffer = this.buffer;
+      if (!buffer) {
+        this.logs = {
+          date: Date.now().toString(),
+          message: "The buffer is not loaded",
+        };
+
+        return null;
+      }
+
+      // get the tensor info index.
       const tensorInfo = this.tensorInfos[index];
+      const dataStart = alignOffset(this._metadataEndOffset);
       const nextTensorInfo = this.tensorInfos[index]?.offset || buffer?.length;
-      const data = buffer?.slice(
-        this._metadataEndOffset + tensorInfo.offset + 1,
-      );
+      const data = buffer?.slice(this._metadataEndOffset + tensorInfo.offset);
       return data;
     }
   }
