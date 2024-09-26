@@ -1,5 +1,9 @@
 "use strict";
-import { readMetadataKeyValuePair, readTensorInfo } from "./Models";
+import {
+  alignOffset,
+  readMetadataKeyValuePair,
+  readTensorInfo,
+} from "./Models";
 import type { Integer, GGUFLogsType, TensorInfosType } from "./Types";
 
 export class GGUF {
