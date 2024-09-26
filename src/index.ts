@@ -13,6 +13,7 @@ export class GGUF {
   private _tensorInfos: TensorInfosType = [];
   private offset: Integer = 0;
   private buffer: Buffer | null = null;
+  private _metadataEndOffset: number = 0;
 
   constructor(file: string = "") {
     if (file) this.file = file;
@@ -150,9 +151,12 @@ export class GGUF {
         });
       }
       this.offset = offset;
+      // store the end of the metadata offset;
+      this._metadataEndOffset = this.offset;
       this.tensorInfos = tensorInfos;
       // read the tensors:
-      for (let i = 0; i < tensorsCount; i++) {}
+      let i;
+      for (i = 0; i < tensorsCount; i++) {}
       console.log("Started reading of the tensors.");
 
       return true;
@@ -165,5 +169,18 @@ export class GGUF {
 
     return false;
   }
-}
 
+  readTensorByIndex(index: Integer) {
+    if (this.tensorsCount) {
+      if (this.tensorsCount >= index)
+        throw new Error("Incorrect tensor index.");
+      const buffer = this.buffer;
+      const tensorInfo = this.tensorInfos[index];
+      const nextTensorInfo = this.tensorInfos[index]?.offset || buffer?.length;
+      const data = buffer?.slice(
+        this._metadataEndOffset + tensorInfo.offset + 1,
+      );
+      return data;
+    }
+  }
+}
