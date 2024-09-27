@@ -1,5 +1,5 @@
 "use strict";
-export function float2HalfFloat(val: number): number {
+export const float2HalfFloat = (val: number): number => {
   const floatView = new Float32Array(1);
   const int32View = new Uint32Array(floatView.buffer);
 
@@ -45,5 +45,4 @@ export function float2HalfFloat(val: number): number {
     mantissa >>= 13;
     return sign | (exponent << 10) | mantissa;
   }
-}
-
+};
