@@ -6,6 +6,7 @@ import validator from "@euriklis/validator-ts";
 const fiveF16 = float2HalfFloat(5);
 const fiveF32 = halfFloat2Float(fiveF16);
 const infF16 = float2HalfFloat(Infinity);
+const negOneF16 = float2HalfFloat(-1);
 
 const answer = new validator(halfFloat2Float(fiveF16))
   .describe("The float2HalfFloat utility function has to:")
@@ -17,6 +18,13 @@ const answer = new validator(halfFloat2Float(fiveF16))
   .and.bind(new validator(halfFloat2Float(infF16)).isSame(Infinity))
   .and.bind(new validator(float2HalfFloat(Infinity)).isSame(infF16))
   .describe("2. convert correctly the Infinity number from F32 to F16.")
-  .test().answer;
+  .test()
+  .and.bind(
+    new validator(halfFloat2Float(negOneF16)).isSame(-1)
+  ).and.bind(
+    new validator(float2HalfFloat(-1)).isSame(negOneF16)
+  ).describe("3. convert correctly the -1 from F32 to F16.")
+  .test()
+  .answer;
 
 test("float2HalfFloat utility function.", () => expect(answer).toBe(true));
