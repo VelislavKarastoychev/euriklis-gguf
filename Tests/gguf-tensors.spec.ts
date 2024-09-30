@@ -12,8 +12,7 @@ const ggufData = await gguf(url, {
 });
 await model.load();
 const tensorInfos = model.tensorInfos;
-const tensor = model.readTensorByIndex(0);
-if (!tensor) console.log(model.logs);
+const tensor = await model.readTensorByIndex(290);
 const answer = new validator(ggufData.tensorInfos)
   .isSame(tensorInfos)
   .describe("The GGUF tensorInfos getter/setter method has to:")
