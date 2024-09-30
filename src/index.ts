@@ -1,11 +1,18 @@
 "use strict";
+import fs from "fs/promises";
 import {
   alignOffset,
   halfFloat2Float,
+  readBytesFromFile,
   readMetadataKeyValuePair,
   readTensorInfo,
 } from "./Models";
-import type { Integer, GGUFLogsType, TensorInfosType, TensorType } from "./Types";
+import type {
+  Integer,
+  GGUFLogsType,
+  TensorInfosType,
+  TensorType,
+} from "./Types";
 
 export class GGUF {
   public static ggmlTypeToTypedArray(dtype: number) {
@@ -122,8 +129,8 @@ export class GGUF {
     if (this.file) {
       // load the file buffer...
       let offset: Integer, n: Integer;
-      const arrayBuffer: ArrayBuffer = await Bun.file(this.file).arrayBuffer();
-      const buffer = Buffer.from(arrayBuffer);
+      //const arrayBuffer: ArrayBuffer = await Bun.file(this.file).arrayBuffer();
+      const buffer: Buffer = await fs.readFile(this.file);
       this.buffer = buffer;
       offset = this.offset;
       this.offset += 4;
@@ -189,6 +196,7 @@ export class GGUF {
       // store the end of the metadata offset;
       this._metadataEndOffset = this.offset;
       this.tensorInfos = tensorInfos;
+      this._tensorInfos.sort((a, b) => Number(a.offset) - Number(b.offset));
       this.alignment = this.metadata["general.alignment"] || this._alignment;
 
       return true;
@@ -202,12 +210,12 @@ export class GGUF {
     return false;
   }
 
-  readTensorByIndex(index: Integer): {
+  async readTensorByIndex(index: Integer): Promise<{
     name: string;
     data: TensorType;
     shape: bigint[];
     dtype: number;
-  } | null {
+  } | null> {
     if (!this.tensorsCount) {
       this.logs = {
         date: Date.now().toString(),
@@ -249,17 +257,23 @@ export class GGUF {
     );
     const tensorInfo = this.tensorInfos[index];
     const dataStart = tensorDataStart + Number(tensorInfo.offset);
-    let dataEnd: number;
-    if (index < this.tensorInfos.length - 1) {
-      const nextTensorInfo = this.tensorInfos[index + 1];
-      dataEnd = tensorDataStart + Number(nextTensorInfo.offset);
-    } else dataEnd = buffer.length;
-    const dataBuffer = buffer.slice(dataStart, dataEnd);
+    const typeInfo = GGUF.ggmlTypeToTypedArray(tensorInfo.dtype);
+    const { TypedArrayConstructor, elementSize } = typeInfo;
     const totalElements = tensorInfo.shape.reduce(
       (total, dim) => total * Number(dim),
       1,
     );
-    const typeInfo = GGUF.ggmlTypeToTypedArray(tensorInfo.dtype);
+    let dataEnd: number;
+    if (index < Number(this.tensorsCount) - 1) {
+      const nextTensorInfo = this.tensorInfos[index + 1];
+      dataEnd = tensorDataStart + Number(nextTensorInfo.offset);
+    } else dataEnd = dataStart + (totalElements * elementSize);
+
+    const dataBuffer = await readBytesFromFile(
+      this.file,
+      dataStart,
+      dataEnd - dataStart,
+    );
     if (!typeInfo) {
       this.logs = {
         date: Date.now().toString(),
@@ -268,8 +282,8 @@ export class GGUF {
 
       return null;
     }
-    const { TypedArrayConstructor, elementSize } = typeInfo;
     const expectedDataLength = elementSize * totalElements;
+    //console.log(elementSize * totalElements, dataBuffer.length);
     if (expectedDataLength > dataBuffer.length) {
       this.logs = {
         date: Date.now().toString(),
@@ -286,10 +300,10 @@ export class GGUF {
       const uint16Array = new Uint16Array(
         dataBuffer.buffer,
         dataBuffer.byteOffset,
-        totalElements
+        totalElements,
       );
       const float32Array = new Float32Array(totalElements);
-      for (let i = 0;i < totalElements;i++) {
+      for (let i = 0; i < totalElements; i++) {
         float32Array[i] = halfFloat2Float(uint16Array[i]);
       }
       dataArray = float32Array;
@@ -297,7 +311,7 @@ export class GGUF {
       dataArray = new TypedArrayConstructor(
         dataBuffer.buffer,
         dataBuffer.byteOffset,
-        totalElements
+        totalElements,
       );
     }
 
@@ -306,6 +320,6 @@ export class GGUF {
       data: dataArray,
       shape: tensorInfo.shape,
       dtype: tensorInfo.dtype,
-    }
+    };
   }
 }
