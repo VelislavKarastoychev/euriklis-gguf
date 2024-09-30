@@ -28,11 +28,13 @@ const answer = new validator(gguf0)
     "3. provide a async method load, which loads the data of the GGUF file.",
   )
   .test()
-  .and.bind(
-    new validator(metadata).isSame(gguf1.metadata),
-  )
+  .and.bind(new validator(metadata).isSame(gguf1.metadata))
   .describe(
     "4. provide getter/setter method metadata, which gets/sets the metadata of the GGUF file.",
+  )
+  .and.bind(
+    new validator(gguf1.tensorInfos[Number(gguf1.tensorsCount) - 1].offset)
+      .isBigInt,
   )
   .test().answer;
 test("GGUF instance testing", () => expect(answer).toBe(true));
