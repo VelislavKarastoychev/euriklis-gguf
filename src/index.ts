@@ -254,11 +254,17 @@ export class GGUF {
       totalElements,
       elementSize,
     );
-    const dataBuffer = await readBytesFromFile(
-      this.file,
-      dataStart,
-      dataEnd - dataStart,
-    );
+    let dataBuffer: Buffer;
+    try {
+      dataBuffer = await readBytesFromFile(
+        this.file,
+        dataStart,
+        dataEnd - dataStart,
+      );
+    } catch (error) {
+      this.logs = (error as Error).message;
+      return null;
+    }
 
     const expectedDataLength = elementSize * totalElements;
     if (expectedDataLength > dataBuffer.length) {
