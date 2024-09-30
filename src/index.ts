@@ -1,7 +1,10 @@
 "use strict";
 import fs from "fs/promises";
+import * as conditions from "./Conditions";
 import {
   alignOffset,
+  calculateTensorDataEnd,
+  convertDataToJSType,
   halfFloat2Float,
   readBytesFromFile,
   readMetadataKeyValuePair,
@@ -12,6 +15,7 @@ import type {
   GGUFLogsType,
   TensorInfosType,
   TensorType,
+  TypedArray,
 } from "./Types";
 
 export class GGUF {
@@ -73,8 +77,12 @@ export class GGUF {
     return this._logs;
   }
 
-  set logs(message: GGUFLogsType) {
-    this._logs.push(message);
+  set logs(message: string) {
+    const log: GGUFLogsType = {
+      date: Date.now().toString(),
+      message,
+    };
+    this._logs.push(log);
   }
 
   get magic(): string {
@@ -123,6 +131,10 @@ export class GGUF {
 
   set tensorInfos(tensorInfos: TensorInfosType) {
     this._tensorInfos = tensorInfos;
+  }
+
+  get isLoaded() {
+    return !!this.buffer;
   }
 
   async load() {
@@ -202,122 +214,69 @@ export class GGUF {
       return true;
     }
 
-    this.logs = {
-      date: Date.now().toString(),
-      message: "No file defined in the current GGUF instance.",
-    };
+    this.logs = "No file defined in the current GGUF instance.";
 
     return false;
   }
 
+  get tensorsDataStart() {
+    return alignOffset(this._metadataEndOffset, this.alignment);
+  }
+
   async readTensorByIndex(index: Integer): Promise<{
     name: string;
-    data: TensorType;
+    data: TypedArray;
     shape: bigint[];
     dtype: number;
   } | null> {
-    if (!this.tensorsCount) {
-      this.logs = {
-        date: Date.now().toString(),
-        message: "No tensors or data not loaded.",
-      };
-
+    const isNotLoaded = conditions.isNotLoaded(this);
+    const tensorsCountNotExists = conditions.tensorsCountNotExists(this);
+    const indexIsInappropriate = conditions.isIndexInconsistent(this, index);
+    if (isNotLoaded || tensorsCountNotExists || indexIsInappropriate)
       return null;
-    }
-    if (Number(this.tensorsCount) <= index) {
-      this.logs = {
-        date: Date.now().toString(),
-        message: "The the tensor data is not loaded.",
-      };
-
-      return null;
-    }
-    if (index < 0) {
-      this.logs = {
-        date: Date.now().toString(),
-        message: "Incorrect tensor index.",
-      };
-
-      return null;
-    }
-    const buffer = this.buffer;
-    if (!buffer) {
-      this.logs = {
-        date: Date.now().toString(),
-        message: "The buffer is not loaded",
-      };
-
-      return null;
-    }
 
     // get the tensor info index.
-    const tensorDataStart = alignOffset(
-      this._metadataEndOffset,
-      this.alignment,
-    );
+    const tensorsDataStart = this.tensorsDataStart;
     const tensorInfo = this.tensorInfos[index];
-    const dataStart = tensorDataStart + Number(tensorInfo.offset);
+
+    const dataStart = tensorsDataStart + Number(tensorInfo.offset);
     const typeInfo = GGUF.ggmlTypeToTypedArray(tensorInfo.dtype);
+
     const { TypedArrayConstructor, elementSize } = typeInfo;
     const totalElements = tensorInfo.shape.reduce(
       (total, dim) => total * Number(dim),
       1,
     );
-    let dataEnd: number;
-    if (index < Number(this.tensorsCount) - 1) {
-      const nextTensorInfo = this.tensorInfos[index + 1];
-      dataEnd = tensorDataStart + Number(nextTensorInfo.offset);
-    } else dataEnd = dataStart + (totalElements * elementSize);
-
+    const dataEnd = calculateTensorDataEnd(
+      this,
+      index,
+      dataStart,
+      totalElements,
+      elementSize,
+    );
     const dataBuffer = await readBytesFromFile(
       this.file,
       dataStart,
       dataEnd - dataStart,
     );
-    if (!typeInfo) {
-      this.logs = {
-        date: Date.now().toString(),
-        message: `Unsupported tensor data type ${tensorInfo.dtype}.`,
-      };
 
-      return null;
-    }
     const expectedDataLength = elementSize * totalElements;
-    //console.log(elementSize * totalElements, dataBuffer.length);
     if (expectedDataLength > dataBuffer.length) {
-      this.logs = {
-        date: Date.now().toString(),
-        message:
-          "The data in the buffer is too short for expected number of total elements.",
-      };
+      this.logs =
+        "The data in the buffer is too short for expected number of total elements.";
 
       return null;
     }
 
-    let dataArray;
-    if (tensorInfo.dtype === 1) {
-      // GGML_TYPE_F16:
-      const uint16Array = new Uint16Array(
-        dataBuffer.buffer,
-        dataBuffer.byteOffset,
-        totalElements,
-      );
-      const float32Array = new Float32Array(totalElements);
-      for (let i = 0; i < totalElements; i++) {
-        float32Array[i] = halfFloat2Float(uint16Array[i]);
-      }
-      dataArray = float32Array;
-    } else {
-      dataArray = new TypedArrayConstructor(
-        dataBuffer.buffer,
-        dataBuffer.byteOffset,
-        totalElements,
-      );
-    }
-
+    const data: TypedArray = convertDataToJSType(
+      tensorInfo,
+      dataBuffer,
+      totalElements,
+      TypedArrayConstructor,
+    );
     return {
       name: tensorInfo.name,
-      data: dataArray,
+      data,
       shape: tensorInfo.shape,
       dtype: tensorInfo.dtype,
     };
