@@ -21,6 +21,7 @@ export const readBytesFromFile = async (
   const bytesContent = new Uint8Array(length);
   const fileHandler = await fs.open(path, "r");
   await fileHandler.read(bytesContent, 0, length, position);
+  await fileHandler.close();
 
   return Buffer.from(bytesContent.buffer);
 };
