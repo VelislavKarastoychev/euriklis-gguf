@@ -47,3 +47,9 @@ export type TypedArray =
   | Int32Array
   | Float32Array
   | Float64Array;
+export type GGUFTensorType = {
+  name: string;
+  data: TypedArray;
+  shape: bigint[];
+  dtype: number;
+};
