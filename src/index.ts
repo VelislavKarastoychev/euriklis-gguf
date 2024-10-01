@@ -5,7 +5,6 @@ import {
   alignOffset,
   calculateTensorDataEnd,
   convertDataToJSType,
-  halfFloat2Float,
   readBytesFromFile,
   readMetadataKeyValuePair,
   readTensorInfo,
@@ -14,8 +13,8 @@ import type {
   Integer,
   GGUFLogsType,
   TensorInfosType,
-  TensorType,
   TypedArray,
+  GGUFTensorType,
 } from "./Types";
 
 export class GGUF {
@@ -134,7 +133,7 @@ export class GGUF {
   }
 
   get isLoaded() {
-    return !!this.buffer;
+    return !!this._metadataEndOffset;
   }
 
   async load() {
@@ -210,6 +209,8 @@ export class GGUF {
       this.tensorInfos = tensorInfos;
       this._tensorInfos.sort((a, b) => Number(a.offset) - Number(b.offset));
       this.alignment = this.metadata["general.alignment"] || this._alignment;
+      // delete the buffer, because we do not need it yet.
+      this.buffer = null;
 
       return true;
     }
@@ -223,12 +224,7 @@ export class GGUF {
     return alignOffset(this._metadataEndOffset, this.alignment);
   }
 
-  async readTensorByIndex(index: Integer): Promise<{
-    name: string;
-    data: TypedArray;
-    shape: bigint[];
-    dtype: number;
-  } | null> {
+  async readTensorByIndex(index: Integer): Promise<GGUFTensorType | null> {
     const isNotLoaded = conditions.isNotLoaded(this);
     const tensorsCountNotExists = conditions.tensorsCountNotExists(this);
     const indexIsInappropriate = conditions.isIndexInconsistent(this, index);
@@ -286,5 +282,13 @@ export class GGUF {
       shape: tensorInfo.shape,
       dtype: tensorInfo.dtype,
     };
+  }
+
+  async readTensorByName(name: string): Promise<GGUFTensorType | null> {
+    const index = this.tensorInfos.findIndex((item) => item.name === name);
+    if (index === -1) return null;
+    const tensor = await this.readTensorByIndex(index);
+
+    return tensor;
   }
 }
